@@ -19,16 +19,24 @@ export class RestaurantResolver {
   }
 
   @Mutation(() => Boolean)
-  createRestaurant(@Args() createRestaurantDto: CreateRestaurantDto) {
+  async createRestaurant(
+    @Args() createRestaurantDto: CreateRestaurantDto,
+  ): Promise<boolean> {
     console.log(`#### createRestaurantDto :`, createRestaurantDto);
 
-    const { name, isVegan, address, ownerName } = createRestaurantDto;
+    const { name, isVegan, address, ownersName } = createRestaurantDto;
 
     console.log(`#### name : ${name}`);
     console.log(`#### isVegan : ${isVegan}`);
     console.log(`#### address : ${address}`);
-    console.log(`#### ownerName : ${ownerName}`);
+    console.log(`#### ownersName : ${ownersName}`);
 
-    return true;
+    try {
+      await this.restaurantService.createRestaurant(createRestaurantDto);
+      return true;
+    } catch (e) {
+      console.log('#### e :', e);
+      return false;
+    }
   }
 }
