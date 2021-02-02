@@ -16,6 +16,11 @@ export class UsersProvider {
     return true;
   }
 
+  @Query(() => User)
+  me() {
+    return { email: 'it-is-dummy' };
+  }
+
   @Mutation(() => CreateAccountOutput)
   async createAccount(
     @Args('input') createAccountInput: CreateAccountInput,
