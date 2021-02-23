@@ -3,12 +3,17 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { CreateAccountInput } from './dtos/create-account.dto';
-import { LoginInput } from './dtos/login.dto';
+import {
+  CreateAccountInput,
+  CreateAccountOutput,
+} from './dtos/create-account.dto';
+import { LoginInput, LoginOutput } from './dtos/login.dto';
 import { User } from './entities/user.entity';
 import { JwtService } from 'src/jwt/jwt.service';
-import { EditProfileInput } from './dtos/edit-profile.dto';
+import { EditProfileInput, EditProfileOutput } from './dtos/edit-profile.dto';
 import { Verification } from './entities/verification.entity';
+import { UserProfileOutput } from './dtos/user-profile.dto';
+import { VerifyEmailOutput } from './dtos/verify-email.dto';
 
 @Injectable()
 export class UsersService {
@@ -25,7 +30,7 @@ export class UsersService {
     email,
     password,
     role,
-  }: CreateAccountInput): Promise<{ ok: boolean; error?: string }> {
+  }: CreateAccountInput): Promise<CreateAccountOutput> {
     try {
       const exist = await this.usersRepository.findOne({ email });
 
@@ -47,12 +52,12 @@ export class UsersService {
     }
   }
 
-  async login({
-    email,
-    password,
-  }: LoginInput): Promise<{ ok: boolean; error?: string; token?: string }> {
+  async login({ email, password }: LoginInput): Promise<LoginOutput> {
     try {
-      const user = await this.usersRepository.findOne({ email });
+      const user = await this.usersRepository.findOne(
+        { email },
+        { select: ['password'] },
+      );
 
       if (!user) {
         return {
@@ -83,29 +88,71 @@ export class UsersService {
     }
   }
 
-  async findById(id: number): Promise<User> {
-    return this.usersRepository.findOne({ id });
+  async findById(id: number): Promise<UserProfileOutput> {
+    // return this.usersRepository.findOne({ id });
+
+    try {
+      const user = await this.usersRepository.findOne({ id });
+
+      if (user) {
+        return {
+          ok: true,
+          user: user,
+        };
+      } else {
+        return { ok: false, error: 'User Not Found' };
+      }
+    } catch (error) {
+      return { ok: false, error: 'User Not Found' };
+    }
   }
 
   async editProfile(
     userId: number,
     { email, password }: EditProfileInput,
-  ): Promise<User> {
-    const user = await this.usersRepository.findOne(userId);
+  ): Promise<EditProfileOutput> {
+    try {
+      const user = await this.usersRepository.findOne(userId);
 
-    if (email) {
-      user.email = email;
-      user.verified = false;
+      if (email) {
+        user.email = email;
+        user.verified = false;
 
-      await this.verificationsRepository.save(
-        this.verificationsRepository.create({ user }),
+        await this.verificationsRepository.save(
+          this.verificationsRepository.create({ user }),
+        );
+      }
+
+      if (password) {
+        user.password = password;
+      }
+
+      await this.usersRepository.save(user);
+
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: 'Could not update profile' };
+    }
+  }
+
+  async verifyEmail(code: string): Promise<VerifyEmailOutput> {
+    try {
+      const verification = await this.verificationsRepository.findOne(
+        { code },
+        { relations: ['user'] },
       );
-    }
 
-    if (password) {
-      user.password = password;
-    }
+      if (verification) {
+        verification.user.verified = true;
 
-    return await this.usersRepository.save(user);
+        this.usersRepository.save(verification.user);
+
+        return { ok: true };
+      }
+
+      return { ok: false, error: 'Verification not found' };
+    } catch (error) {
+      return { ok: false, error };
+    }
   }
 }
